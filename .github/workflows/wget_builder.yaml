@@ -332,6 +332,36 @@ jobs:
           cp "./busybox_WGET" "$GITHUB_WORKSPACE/main/wget/wget_busybox_i686_x86_gcc_Linux"
         continue-on-error: true
 
+      - name: Build wget for i686_musl_Linux (MUSL-Docker --> abcfy2/muslcc-toolchain-ubuntu)
+        #if: env.versions_same != 'true'
+        run: |
+          docker run --privileged --name i686_musl_Linux \
+            -e "BUSYBOX_URL=${BUSYBOX_URL}" \
+            abcfy2/muslcc-toolchain-ubuntu:i686-linux-musl \
+            bash -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt update -y
+              apt install -y autoconf automake autopoint curl file g++ make libtool jq pkgconf tcl patch wget unzip
+              curl -qfLJO "$BUSYBOX_URL"
+              find . -type f -name "*.tar.bz2*" -exec tar -xjvf {} \;
+              cd $(find . -maxdepth 1 -type d -name "*busybox*" | grep -v "^.$")
+              export ARCH=i686
+              export CROSS_COMPILE=i686-linux-musl-
+              make defconfig
+              sed -e "s/.*\<CONFIG_STATIC\>.*/CONFIG_STATIC=y/" -i .config
+              sed -e "s/CONFIG_CROSS_COMPILER_PREFIX=\"\"/CONFIG_CROSS_COMPILER_PREFIX=\"i686-linux-musl-\"/" -i .config
+              bash "./make_single_applets.sh" WGET
+              sha256sum "./busybox_WGET" && file "./busybox_WGET" && ls -lah "./busybox_WGET"
+              cp "./busybox_WGET" "/wget_busybox_i686_musl_Linux"
+            '
+          #Copy
+          docker cp "m68k_linux_musl_Linux:/wget_busybox_m68k_linux_musl_Linux" "$GITHUB_WORKSPACE/main/wget/"
+          #Delete Containers
+          docker rm $(docker ps -a -q)
+          #Del Docker Images
+          docker rmi -f $(docker images -q) >/dev/null 2>&1
+        continue-on-error: true
+
       - name: Build wget for m68k_gcc_Linux (GCC-Native)
         #if: env.versions_same != 'true'
         run: |
